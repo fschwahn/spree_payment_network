@@ -6,7 +6,7 @@ CheckoutController.class_eval do
     @order = Order.find(params[:order_id])
     
     if @order && params[:status] == 'success'
-      @order.next
+      while @order.state != 'confirm' { @order.next }
       gateway = PaymentMethod.find(params[:payment_method_id])
       
       @order.payments.clear
