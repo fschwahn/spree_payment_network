@@ -3,7 +3,6 @@ CheckoutController.class_eval do
   skip_before_filter :verify_authenticity_token, :only => [:process_callback]
   
   def process_callback
-    debugger
     @order = Order.find(params[:order_id])
     
     if @order && params[:status] == 'success'
