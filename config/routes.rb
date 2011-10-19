@@ -1,3 +1,3 @@
 Rails.application.routes.draw do
-  # Add your extension routes here
+  match '/checkout/process_callback' => 'checkout#process_callback', :method => :get, :as => 'process_callback'
 end
