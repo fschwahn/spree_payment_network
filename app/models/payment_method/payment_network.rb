@@ -6,9 +6,5 @@ class PaymentMethod::PaymentNetwork < PaymentMethod
   def server_url
     "https://www.sofortueberweisung.de/payment/start"
   end
-  
-  # force confirm step
-  def payment_profiles_supported?
-    true
-  end
+
 end
