@@ -1,3 +1,3 @@
 Rails.application.routes.draw do
-  match '/checkout/process_callback' => 'checkout#process_callback', :method => :get, :as => 'process_callback'
+  match '/checkout/payment_network_callback' => 'checkout#payment_network_callback', :method => :get
 end

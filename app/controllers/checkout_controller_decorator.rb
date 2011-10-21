@@ -1,13 +1,29 @@
 CheckoutController.class_eval do
-  skip_before_filter :load_order, :only => [:process_callback]
-  skip_before_filter :verify_authenticity_token, :only => [:process_callback]
+  before_filter :redirect_to_payment_network_form_if_needed, :only => [:update]
+  skip_before_filter :load_order, :only => [:payment_network_callback]
+  skip_before_filter :verify_authenticity_token, :only => [:payment_network_callback]
   
-  def process_callback
+  def redirect_to_payment_network_form_if_needed
+    return unless (params[:state] == "payment")
+    return unless params[:order][:payments_attributes]
+    if params[:order][:coupon_code]
+      @order.update_attributes(object_params)
+      @order.process_coupon_code
+    end
+    load_order
+    payment_method = PaymentMethod.find(params[:order][:payments_attributes].first[:payment_method_id])
+
+    if payment_method.kind_of?(PaymentMethod::PaymentNetwork)
+      redirect_to "#{payment_method.server_url}?user_id=#{payment_method.preferred_user_id}&project_id=#{payment_method.preferred_project_id}&amount=#{@order.total}&reason_1=#{@order.number}&user_variable_0=#{payment_method.id}&user_variable_1=#{@order.id}&hash=#{payment_method.hash_value({:amount => @order.total, :reason_1 => @order.number, :user_variable_1 => @order.id})}"
+    end
+  end
+  
+  def payment_network_callback
     @order = Order.find(params[:order_id])
     
     if @order && params[:status] == 'success'
       gateway = PaymentMethod.find(params[:payment_method_id])
-      
+
       @order.payments.clear
       payment = @order.payments.create
       payment.started_processing
@@ -16,26 +32,16 @@ CheckoutController.class_eval do
       payment.complete
       @order.save
 
-      fire_event('spree.checkout.update')
-      if @order.respond_to?(:coupon_code) && @order.coupon_code.present?
-        fire_event('spree.checkout.coupon_code_added', :coupon_code => @order.coupon_code)
+      #need to force checkout to complete state
+      until @order.state == "complete"
+        if @order.next!
+          @order.update!
+          state_callback(:after)
+        end
       end
 
-      if @order.next
-        state_callback(:after)
-      else
-        flash[:error] = I18n.t(:payment_processing_failed)
-        redirect_to checkout_state_path(@order.state)
-        return
-      end
-
-      if @order.state == "complete" || @order.completed?
-        flash[:notice] = I18n.t(:order_processed_successfully)
-        flash[:commerce_tracking] = "nothing special"
-        redirect_to completion_route
-      else
-        redirect_to checkout_state_path(@order.state)
-      end
+      flash[:notice] = I18n.t(:order_processed_successfully)
+      redirect_to completion_route
     else
       redirect_to checkout_state_path(@order.state)
     end
