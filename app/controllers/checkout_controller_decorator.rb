@@ -4,16 +4,21 @@ CheckoutController.class_eval do
   skip_before_filter :verify_authenticity_token, :only => [:payment_network_callback]
   
   def redirect_to_payment_network_form_if_needed
-    return unless (params[:state] == "payment")
-    return unless params[:order][:payments_attributes]
-    if params[:order][:coupon_code]
-      @order.update_attributes(object_params)
-      fire_event('spree.checkout.coupon_code_added', :coupon_code => @order.coupon_code)
+    confirmation_step_present = Gateway.current && Gateway.current.payment_profiles_supported?
+    if !confirmation_step_present && params[:state] == "payment"
+      return unless params[:order][:payments_attributes]
+      if params[:order][:coupon_code]
+        @order.update_attributes(object_params)
+        fire_event('spree.checkout.coupon_code_added', :coupon_code => @order.coupon_code)
+      end
+      load_order
+      payment_method = PaymentMethod.find(params[:order][:payments_attributes].first[:payment_method_id])
+    elsif confirmation_step_present && params[:state] == "confirm"
+      load_order
+      payment_method = @order.payment_method
     end
-    load_order
-    payment_method = PaymentMethod.find(params[:order][:payments_attributes].first[:payment_method_id])
 
-    if payment_method.kind_of?(PaymentMethod::PaymentNetwork)
+    if !payment_method.nil? && payment_method.kind_of?(PaymentMethod::PaymentNetwork)
       redirect_to "#{payment_method.server_url}?user_id=#{payment_method.preferred_user_id}&project_id=#{payment_method.preferred_project_id}&amount=#{@order.total}&reason_1=#{@order.number}&user_variable_0=#{payment_method.id}&user_variable_1=#{@order.id}&hash=#{payment_method.hash_value({:amount => @order.total, :reason_1 => @order.number, :user_variable_1 => @order.id})}"
     end
   end
