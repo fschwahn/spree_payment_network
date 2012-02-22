@@ -1,13 +1,15 @@
+# encoding: UTF-8
+
 class PaymentMethod::PaymentNetwork < PaymentMethod
   preference :project_id, :string
   preference :user_id, :string
   preference :project_password, :string
   preference :button_text, :string, :default => 'Mit sofortüberweisung bezahlen'
-  
+
   def server_url
     "https://www.sofortueberweisung.de/payment/start"
   end
-  
+
   def hash_value(options = {})
     data = ActiveSupport::OrderedHash.new
     data[:user_id] = preferred_user_id
